@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("admin")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  title        String
+  slug         String        @unique
+  description  String        @db.Text
+  content      String?       @db.Text
+  imageUrl     String?
+  demoUrl      String?
+  githubUrl    String?
+  techStack    String[]
+  category     String        @default("web")
+  tags         String[]
+  featured     Boolean       @default(false)
+  difficulty   String        @default("intermediate")
+  status       PublishStatus @default(DRAFT)
+  order        Int           @default(0)
+  viewCount    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model BlogPost {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  excerpt     String        @db.Text
+  content     String        @db.Text
+  coverImage  String?
+  category    String        @default("general")
+  tags        String[]
+  status      PublishStatus @default(DRAFT)
+  readTime    Int           @default(5)
+  viewCount   Int           @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Skill {
+  id        String        @id @default(cuid())
+  name      String
+  category  String        @default("frontend")
+  level     Int           @default(80)
+  icon      String?
+  status    PublishStatus @default(PUBLISHED)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model Experience {
+  id          String        @id @default(cuid())
+  company     String
+  role        String
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  current     Boolean       @default(false)
+  description String        @db.Text
+  highlights  String[]
+  status      PublishStatus @default(PUBLISHED)
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Certificate {
+  id           String        @id @default(cuid())
+  title        String
+  issuer       String
+  issueDate    DateTime
+  expiryDate   DateTime?
+  credentialId String?
+  credentialUrl String?
+  imageUrl     String?
+  status       PublishStatus @default(PUBLISHED)
+  order        Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Resume {
+  id        String   @id @default(cuid())
+  summary   String   @db.Text
+  fileUrl   String?
+  content   Json?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model Timeline {
+  id          String        @id @default(cuid())
+  title       String
+  description String        @db.Text
+  date        DateTime
+  type        String        @default("milestone")
+  icon        String?
+  status      PublishStatus @default(PUBLISHED)
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model SocialLink {
+  id        String        @id @default(cuid())
+  platform  String
+  url       String
+  icon      String?
+  status    PublishStatus @default(PUBLISHED)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model Testimonial {
+  id        String        @id @default(cuid())
+  name      String
+  role      String
+  company   String?
+  content   String        @db.Text
+  avatar    String?
+  rating    Int           @default(5)
+  status    PublishStatus @default(PUBLISHED)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model Service {
+  id          String        @id @default(cuid())
+  title       String
+  description String        @db.Text
+  icon        String?
+  status      PublishStatus @default(PUBLISHED)
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model FAQ {
+  id        String        @id @default(cuid())
+  question  String
+  answer    String        @db.Text
+  category  String        @default("general")
+  status    PublishStatus @default(PUBLISHED)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  spam      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  type      String
+  path      String?
+  metadata  Json?
+  sessionId String?
+  country   String?
+  device    String?
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([sessionId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String
+  content   String   @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model SiteSettings {
+  id              String  @id @default("site")
+  siteName        String  @default("M Hasnat Khan")
+  tagline         String  @default("Frontend Developer & AI Enthusiast")
+  bio             String  @db.Text
+  email           String  @default("dk.vagita@gmail.com")
+  location        String  @default("Pakistan")
+  available       Boolean @default(true)
+  githubUsername  String?
+  heroImage       String?
+  aiJourney       String? @db.Text
+  currentlyLearning String[]
+}
