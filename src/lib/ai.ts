@@ -1,9 +1,11 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "@/lib/prisma";
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
+
+const MODEL = "gemini-2.5-flash";
 
 export async function buildPortfolioContext() {
   const [
@@ -131,49 +133,48 @@ export async function chatWithPortfolioAI(
 
   const contextBlock = JSON.stringify(context, null, 2);
 
-  if (!openai) {
+  if (!genAI) {
     return fallbackResponse(message, context);
   }
 
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    messages: [
-      { role: "system", content: `${SYSTEM_PROMPT}\n\nPORTFOLIO CONTEXT:\n${contextBlock}` },
-      ...history.slice(-10).map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-      { role: "user", content: message },
-    ],
-    temperature: 0.4,
-    max_tokens: 800,
+  const model = genAI.getGenerativeModel({
+    model: MODEL,
+    systemInstruction: `${SYSTEM_PROMPT}\n\nPORTFOLIO CONTEXT:\n${contextBlock}`,
   });
 
-  return (
-    response.choices[0]?.message?.content ||
-    "I'm having trouble responding right now. Please try again."
-  );
+  const chat = model.startChat({
+    history: history.slice(-10).map((m) => ({
+      role: m.role === "user" ? "user" : "model",
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 800,
+    },
+  });
+
+  const result = await chat.sendMessage(message);
+  const response = result.response.text();
+
+  return response || "I'm having trouble responding right now. Please try again.";
 }
 
 export async function analyzeJobMatch(jobDescription: string) {
   const context = await buildPortfolioContext();
 
-  if (!openai) {
+  if (!genAI) {
     return {
       matchScore: 0,
-      strengths: ["AI analysis requires OPENAI_API_KEY to be configured."],
+      strengths: ["AI analysis requires GEMINI_API_KEY to be configured."],
       gaps: [],
       recommendedProjects: context.projects.slice(0, 3).map((p) => p.title),
-      summary: "Configure OpenAI to enable job matching.",
+      summary: "Configure Gemini to enable job matching.",
     };
   }
 
-  const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: `You are a career matching assistant. Compare the candidate profile against the job description.
+  const model = genAI.getGenerativeModel({
+    model: MODEL,
+    systemInstruction: `You are a career matching assistant. Compare the candidate profile against the job description.
 Return ONLY valid JSON with this shape:
 {
   "matchScore": number (0-100),
@@ -183,18 +184,19 @@ Return ONLY valid JSON with this shape:
   "summary": string
 }
 Use ONLY the candidate profile data. Do not invent qualifications.`,
-      },
-      {
-        role: "user",
-        content: `CANDIDATE PROFILE:\n${JSON.stringify(context)}\n\nJOB DESCRIPTION:\n${jobDescription}`,
-      },
-    ],
-    temperature: 0.3,
-    response_format: { type: "json_object" },
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: "application/json",
+    },
   });
 
+  const result = await model.generateContent(
+    `CANDIDATE PROFILE:\n${JSON.stringify(context)}\n\nJOB DESCRIPTION:\n${jobDescription}`
+  );
+  const text = result.response.text();
+
   try {
-    return JSON.parse(response.choices[0]?.message?.content || "{}");
+    return JSON.parse(text);
   } catch {
     return {
       matchScore: 0,
@@ -235,7 +237,7 @@ function fallbackResponse(
       ? "Yes! Hasnat is currently available for freelance work."
       : "Hasnat is not actively taking new freelance projects right now.";
   }
-  return "I'm running in offline mode. Configure OPENAI_API_KEY for full AI capabilities. Try asking about projects, skills, or contact info.";
+  return "I'm running in offline mode. Configure GEMINI_API_KEY for full AI capabilities. Try asking about projects, skills, or contact info.";
 }
 
 export async function filterProjectsByQuery(query: string) {
