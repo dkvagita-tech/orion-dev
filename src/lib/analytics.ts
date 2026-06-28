@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function trackEvent(
@@ -16,7 +17,7 @@ export async function trackEvent(
       data: {
         type,
         path,
-        metadata: metadata ?? {},
+        metadata: (metadata ?? {}) as Prisma.InputJsonValue,
         device,
         sessionId: metadata?.sessionId as string | undefined,
       },

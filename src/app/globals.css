@@ -1,6 +1,10 @@
 @import "tailwindcss";
+@import "@fontsource/inter/latin.css";
+@import "@fontsource/sora/latin.css";
 
 :root {
+  --font-inter: "Inter";
+  --font-sora: "Sora";
   --background: #07070d;
   --foreground: #f4f4f8;
   --muted-foreground: #a8a8b8;
